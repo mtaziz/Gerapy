@@ -1,7 +1,26 @@
 <template>
-
   <div class="panel">
+    <el-dialog :visible.sync="createProjectDialog" size="tiny">
+      <el-form>
+        <el-form-item label="项目名称">
+          <el-input
+            v-model="projectName" class="inline" placeholder="项目名称"
+            size="small">
+          </el-input>
+        </el-form-item>
+      </el-form>
+      <div slot="footer">
+        <el-button @click="createProjectDialog=false" size="small">取消</el-button>
+        <el-button @click="onCreateProject()"
+                   type="primary" size="small">添加
+        </el-button>
+      </div>
+    </el-dialog>
     <panel-title title="项目管理">
+      <el-button type="primary" size="mini" @click="createProjectDialog=true">
+        <i class="fa fa-plus"></i>
+        创建
+      </el-button>
     </panel-title>
     <div class="panel-body">
       <el-table
@@ -23,7 +42,7 @@
         </el-table-column>
         <el-table-column
           align="center"
-          label="项目版本"
+          label="版本描述"
           width="100">
           <template scope="props">
             <span v-if="buildInfos[props.row.name]">
@@ -34,10 +53,20 @@
         <el-table-column
           align="center"
           label="已打包"
-          width="100">
+          width="80">
           <template scope="props">
             <span v-if="buildInfos[props.row.name]">
               {{ buildInfos[props.row.name]['egg'] ? '是' : '否' }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column
+          align="center"
+          label="可配置"
+          width="80">
+          <template scope="props">
+            <span v-if="buildInfos[props.row.name]">
+              {{ buildInfos[props.row.name]['configurable'] ? '是' : '否' }}
             </span>
           </template>
         </el-table-column>
@@ -65,7 +94,14 @@
           align="center"
           label="操作">
           <template scope="props">
-            <router-link :to="{name: 'projectEdit', params: {name: props.row.name}}" tag="span">
+            <router-link :to="{name: 'projectConfigure', params: {name: props.row.name}}" tag="span"
+                         v-if="buildInfos[props.row.name]['configurable']">
+              <el-button type="warning" size="mini">
+                <i class="fa fa-edit"></i>
+                配置
+              </el-button>
+            </router-link>
+            <router-link :to="{name: 'projectEdit', params: {name: props.row.name}}" tag="span" v-else>
               <el-button type="warning" size="mini">
                 <i class="fa fa-edit"></i>
                 编辑
@@ -77,12 +113,12 @@
                 部署
               </el-button>
             </router-link>
-            <router-link :to="{name: 'projectMonitor', params: {name: props.row.name}}" tag="span">
-              <el-button type="info" size="mini">
-                <i class="fa fa-podcast"></i>
-                监控
-              </el-button>
-            </router-link>
+            <!--<router-link :to="{name: 'projectMonitor', params: {name: props.row.name}}" tag="span">-->
+            <!--<el-button type="info" size="mini">-->
+            <!--<i class="fa fa-podcast"></i>-->
+            <!--监控-->
+            <!--</el-button>-->
+            <!--</router-link>-->
             <el-button type="danger" size="mini" @click="onSingleDelete(props.row.name)">
               <i class="fa fa-remove"></i>
               删除
@@ -110,6 +146,8 @@
   export default{
     data(){
       return {
+        createProjectDialog: false,
+        projectName: null,
         projects: [],
         //请求时的loading效果
         loadData: false,
@@ -136,7 +174,6 @@
         }).then(({data: data}) => {
           this.$set(this.buildInfos, name, data)
           this.loadData = false
-          console.log('LLLL', this.buildInfos)
         }).catch(() => {
           this.loadData = false
         })
@@ -165,7 +202,6 @@
           this.loadData = false
           this.getProjectData()
         }).catch((error) => {
-          console.log(error)
           this.loadData = false
           this.$message.error('删除失败')
         })
@@ -194,6 +230,18 @@
           })
         }).catch(() => {
           this.$message.error('批量删除出错')
+        })
+      },
+      onCreateProject() {
+        this.$fetch.apiProject.projectCreate({
+          name: this.projectName
+        }).then(() => {
+          this.$message.success('创建成功')
+          this.loadData = false
+          this.$router.push({name: 'projectConfigure', params: {name: this.projectName}})
+        }).catch((error) => {
+          this.loadData = false
+          this.$message.error('创建失败')
         })
       }
     }

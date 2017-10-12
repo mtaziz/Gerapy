@@ -5,6 +5,8 @@ import shutil
 import time
 from django.shortcuts import render
 from django.utils.dateformat import format
+from pip import commands
+
 from gerapy.server.core.build import build_project, find_egg
 from gerapy.server.core.utils import IGNORES
 from gerapy.cmd.init import PROJECTS_FOLDER
@@ -120,6 +122,36 @@ def project_index(request):
         return HttpResponse(json.dumps(project_list))
 
 
+def project_create(request):
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        data['configurable'] = 1
+        path = os.path.abspath(merge(os.getcwd(), PROJECTS_FOLDER))
+        cmd = 'cd ' + path + '&& scrapy startproject ' + data.get('name')
+        result = os.system(cmd)
+        if result == 0:
+            Project.objects.update_or_create(**data)
+            return HttpResponse(data.get('name'))
+
+
+def project_configure(request, name):
+    if request.method == 'GET':
+        project = Project.objects.get(name=name)
+        project = model_to_dict(project)
+        project['configuration'] = json.loads(project['configuration'])
+        del project['clients']
+        return HttpResponse(json.dumps(project))
+    elif request.method == 'POST':
+        project = Project.objects.filter(name=name)
+        data = json.loads(request.body)
+        configuration = json.dumps(data.get('configuration'))
+        project.update(**{'configuration': configuration})
+        project = Project.objects.get(name=name)
+        project = model_to_dict(project)
+        del project['clients']
+        return HttpResponse('1')
+
+
 def project_tree(request, name):
     if request.method == 'GET':
         path = os.path.abspath(merge(os.getcwd(), PROJECTS_FOLDER))
@@ -176,6 +208,7 @@ def project_remove(request, project):
         if project:
             project_path = merge(path, project)
             shutil.rmtree(project_path)
+            Project.objects.filter(name=project).delete()
             return HttpResponse(json.dumps('1'))
 
 
@@ -240,7 +273,10 @@ def project_build(request, project):
             dict['built_at'] = time.strftime('%Y-%m-%d %H:%M:%S', localtime)
             return HttpResponse(json.dumps(dict))
         else:
-            return HttpResponse(json.dumps({'name': project}))
+            model = Project.objects.get(name=project)
+            dict = model_to_dict(model)
+            del dict['clients']
+            return HttpResponse(json.dumps(dict))
     elif request.method == 'POST':
         data = json.loads(request.body)
         description = data['description']
